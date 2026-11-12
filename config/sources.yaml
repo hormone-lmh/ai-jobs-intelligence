@@ -1,0 +1,64 @@
+# 数据源配置（2026-11-11 阶段 1 实测后修订）
+# role: primary（当前主路径）| snapshot（快照文件导入）| manual（手动粘贴）| disabled
+#
+# 修订原因：自动化浏览器访问目标站被识别，页面被置为空页，字段不可取。
+# 证据见 docs/01-数据可行性报告.md §4。系统不再尝试绕过，主路径改为「用户自己取得内容 + 本地解析」。
+
+sources:
+  # 保留适配器接口与数据结构，但关闭。若未来平台开放正式接口或取得书面授权，只替换此模块。
+  zhipin:
+    enabled: false
+    role: disabled
+    adapter: zhipin
+    mode: playwright_profile
+    profile_dir: data/browser_profile
+    rate_limit:
+      min_interval_seconds: 10
+      max_concurrent: 1
+      max_rounds_per_day: 1
+    scope:
+      keywords: ["大模型应用开发", "大模型算法", "LLM", "RAG", "Agent"]
+      cities: ["上海", "北京", "深圳", "杭州"]
+      experience: ["1-3年", "3-5年"]
+      degree: ["本科", "硕士"]
+    verification:
+      tested_at: "2026-11-11"
+      result: page_cleared_by_platform
+      evidence: "headless True/False 均先返回 200，随后页面被置为 about:blank，body 39 字符，岗位卡片 0；同环境访问 example.com 两种模式均正常（200 / Example Domain / 1989 字节）"
+      conclusion: "自动化客户端被识别，非登录问题、非频控。不做绕过，改走用户自取内容的通道。"
+
+  # 主路径：你在自己浏览器里看到的页面，存成文件或整页复制，落到 inbox 由系统解析
+  snapshot_import:
+    enabled: true
+    role: primary
+    adapter: snapshot
+    inbox: data/raw/inbox
+    accepts: [html, txt, pdf, csv, xlsx, json]
+    note: "来源与采集时间以文件时间为准，页面原文落 data/raw/<batch_id>/，可回溯"
+
+  # 补充路径：整页粘贴，按规则切成多条岗位；单条 JD 也走这里
+  manual_paste:
+    enabled: true
+    role: manual
+    adapter: manual
+    note: "一次可粘多条列表摘要，也可单条粘完整 JD"
+
+  file_import:
+    enabled: true
+    role: snapshot
+    adapter: file
+    formats: [csv, xlsx, json]
+    template: config/import_template.csv
+
+# 合规状态：显式记录，作为"来源健康度"的基线，页面需展示，不得隐藏
+compliance:
+  zhipin:
+    robots_url: https://www.zhipin.com/robots.txt
+    checked_at: "2026-11-11"
+    status: disallowed_query_paths
+    evidence: "robots 含 Disallow: /*?*，筛选与翻页依赖查询参数，按协议不允许抓取"
+    technical_status: blocked_by_automation_detection
+    note: "协议不允许 + 技术上被识别，双重不成立。系统不实现验证码破解、cookie 伪造、代理轮换、频率规避；采集适配器关闭。"
+  user_snapshot:
+    status: allowed
+    note: "用户本人访问后取得的内容，由用户自行判断使用边界；系统只做本地解析"

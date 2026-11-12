@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>AI 岗位情报分析</title>
+<link rel="stylesheet" href="/style.css">
+<script defer src="/app.js"></script>
+<script defer src="/intelligence.js"></script>
+</head>
+<body>
+<a class="skipLink" href="#workspace">跳到内容</a>
+<aside class="sidebar"><a class="brand" href="/" aria-label="岗位情报首页"><span class="brandMark">J</span><span>岗位情报<small>AI JOB INTELLIGENCE</small></span></a><p class="navLabel">分析工作台</p>
+<nav class="workspaceNav" aria-label="工作区"><button data-view="explore" aria-pressed="true"><span class="navIcon" aria-hidden="true">▦</span>岗位与技能</button><button data-view="companies" aria-pressed="false"><span class="navIcon" aria-hidden="true">▤</span>招聘公司</button><button data-view="compare" aria-pressed="false"><span class="navIcon" aria-hidden="true">⇄</span>需求对比</button></nav>
+<div class="sidebarNote"><span class="localDot"></span>本地工作空间<p>从真实岗位出发<br>让每一项需求都有依据</p></div></aside>
+<main id="workspace">
+<header><div><p class="eyebrow">WORKSPACE / OVERVIEW</p><h1>AI 岗位情报分析</h1><p class="headerSubtitle">发现机会，读懂岗位背后的技能需求。</p></div><div class="headerActions"><button id="openImport">＋ 补充正文</button><button id="refresh" class="primary">刷新数据</button></div></header>
+<div class="scopeNote"><span class="scopeBadge">样本分析</span><span>基于已采集岗位，非平台全量；在招状态请以原页面为准。</span></div>
+<p id="status" role="status">正在加载…</p>
+<section class="metrics" aria-label="数据覆盖">
+<article><span>已搜集岗位 <i>01</i></span><strong id="jobsCount">—</strong><small>按职位 ID 去重后的样本</small></article>
+<article><span>样本中的公司 <i>02</i></span><strong id="companiesCount">—</strong><small>探索企业与关联职位</small></article>
+<article class="coverageMetric"><span>已有正文 / JD 覆盖率 <i>03</i></span><strong id="jdCount">—</strong><div class="coverageTrack" aria-hidden="true"><div id="coverageFill"></div></div></article>
+<article><span>最近见到岗位 <i>04</i></span><strong id="lastSeen" class="small">—</strong><small>采集时间，不等于发布时间</small></article>
+</section>
+
+<div id="view-explore">
+<section class="filterPanel panel" aria-label="岗位筛选"><div class="sectionHeading"><h2>筛选岗位</h2><button id="resetFilters" class="textButton">重置筛选</button></div><div class="filters">
+<label>岗位或公司<input id="query" type="search" placeholder="例如：大模型、Agent、公司名称"></label>
+<div class="cityFilter"><label for="city">城市筛选</label><div class="cityInput"><input id="city" type="search" list="cityOptions" autocomplete="off" placeholder="全部城市 · 输入或选择城市" aria-describedby="cityHint"><button id="clearCity" type="button" aria-label="清除城市筛选" title="恢复全部城市">全部</button></div><datalist id="cityOptions"></datalist><small id="cityHint" class="muted">正在读取已采集城市…</small></div>
+<label>分析依据<select id="source"><option value="jd">岗位正文技能提及</option><option value="summary">标题与标签技能分布</option></select></label>
+<label>公司精确名称<input id="company" type="search" placeholder="从公司视图选择，或输入全名"></label><button id="search" class="primary">应用筛选</button>
+</div><div id="activeFilters" class="activeFilters" aria-label="当前筛选条件"></div></section>
+<div class="layout">
+<section class="panel skills"><p class="eyebrow">SKILL INSIGHTS</p><h2 id="skillsTitle">岗位正文技能提及</h2><p id="denominator" class="muted"></p><p class="muted">词典识别的是技能提及，尚不区分必备、加分或否定语境。点击技能筛选岗位。</p><div id="skills"></div><button id="clearSkill" hidden>清除技能筛选</button></section>
+<section class="panel resultsPanel"><div class="sectionHeading"><h2>岗位探索</h2><span id="listCount" class="muted"></span></div><p id="filterHint" class="muted"></p><div id="jobs"></div><nav class="pagination" aria-label="岗位分页"><button id="prev">上一页</button><span id="pageNumber"></span><button id="next">下一页</button></nav></section>
+</div>
+<section class="panel import" id="importSection"><h2>补充岗位正文</h2><p class="muted">在 BOSS 详情页复制该岗位的职责与任职要求，粘贴到这里。请保留原文，避免混入推荐职位或公司介绍；同一岗位再次提交会替换当前正文，原始记录仍会保留。</p><form id="jdForm"><label>BOSS 职位详情链接<input id="jdUrl" type="url" required placeholder="https://www.zhipin.com/job_detail/…html"></label><label>岗位正文<textarea id="jdText" rows="7" minlength="20" maxlength="100000" required placeholder="至少 20 个字符；可从岗位卡片点击「补充正文」自动填写链接。"></textarea></label><button id="saveJd" type="submit" class="primary">保存并重新分析</button><span id="importStatus" role="status"></span></form></section>
+</div>
+<section id="view-companies" hidden>
+<div class="panel"><h2>样本中的招聘公司</h2><p class="muted">按已搜集岗位汇总。最近见到不等于确认仍在招；打开岗位原页面核验。没有正文时，不从标题推断公司的技能需求。</p>
+<div class="filters"><label>公司名称<input id="companyQuery" type="search" placeholder="包含关键词"></label><label>城市<input id="companyCity" type="search" placeholder="精确城市"></label><button id="companySearch" class="primary">查找公司</button></div>
+<p id="companyStatus" role="status"></p><div id="companyCards" class="companyGrid"></div><nav class="pagination"><button id="companyPrev">上一页</button><span id="companyPage"></span><button id="companyNext">下一页</button></nav></div>
+</section>
+<section id="view-compare" hidden>
+<div class="panel"><h2>两组岗位，需求有什么不同？</h2><p class="muted">可对比岗位关键词、城市或公司。关键词仅搜索岗位标题；城市和公司按精确名称匹配。留空表示不限制，两组允许重叠。此处是当前样本横向对比，不是市场时间趋势。</p>
+<form id="compareForm"><div class="cohortGrid">
+<fieldset><legend>A 组</legend><label>岗位关键词<input id="leftKeyword" placeholder="例如：大模型"></label><label>城市<input id="leftCity" placeholder="例如：重庆"></label><label>公司全名<input id="leftCompany" placeholder="可选"></label></fieldset>
+<fieldset><legend>B 组</legend><label>岗位关键词<input id="rightKeyword" placeholder="例如：Python"></label><label>城市<input id="rightCity" placeholder="例如：上海"></label><label>公司全名<input id="rightCompany" placeholder="可选"></label></fieldset>
+</div><button type="submit" id="compareRun" class="primary">分析两组需求</button></form><p id="compareStatus" role="status">选择两组条件后开始分析。</p><div id="compareWarnings"></div><div id="compareSummary" class="cohortGrid"></div><div id="compareResults"></div></div>
+</section>
+<footer>数据保存在本机 · 薪资中的 □ 表示数字不可识别，暂不参与薪资分析 · 扩展需要你本人浏览页面才能采集</footer>
+</main>
+<dialog id="detailDialog"><div class="sectionHeading"><h2 id="detailTitle">岗位详情</h2><button id="closeDetail" aria-label="关闭详情">关闭</button></div><p id="detailMeta" class="muted"></p><h3>岗位正文</h3><pre id="detailBody"></pre><h3>技能与原文依据</h3><div id="evidence"></div></dialog>
+</body></html>

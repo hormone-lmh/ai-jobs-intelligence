@@ -1,0 +1,316 @@
+# AI 岗位技能词典 v1
+# 用途：规则匹配的基础词表。仅用于初始分类，不代表市场结论。
+# 匹配实现约定（重要）：
+#   拉丁缩写不要用 \b 作边界。中文与字母同属 \w，"使用RAG技术" 里 RAG 两侧都不是边界，
+#   用 \b 会全部漏匹配。应采用断言： (?<![A-Za-z0-9])RAG(?![A-Za-z0-9])
+# 修改本文件后，需重跑 skill 提取，历史快照不受影响（见 docs/03-指标口径.md）。
+
+version: 1
+updated_at: "2026-11-11"
+
+directions:
+  - id: llm_app
+    name: 大模型应用开发
+  - id: llm_train
+    name: 大模型算法与训练
+  - id: ai_infra
+    name: AI 推理与基础设施
+  - id: cv_mm
+    name: 计算机视觉与多模态
+  - id: nlp_rec
+    name: NLP、搜索与推荐
+  - id: ai_product
+    name: AI 产品与解决方案
+
+# 首版只启用前两个方向做闭环，其余保留定义但不参与首版统计
+enabled_directions: [llm_app, llm_train]
+
+skills:
+  # ---------- 语言与框架 ----------
+  - canonical: Python
+    aliases: ["Python", "python3", "Python3"]
+    direction: [llm_app, llm_train, ai_infra, cv_mm, nlp_rec]
+    category: language
+
+  - canonical: PyTorch
+    aliases: ["PyTorch", "pytorch", "torch"]
+    direction: [llm_train, cv_mm, nlp_rec]
+    category: framework
+    risk: ["torchvision", "torchaudio"]   # 属工具库，不与框架本体合并计数
+
+  - canonical: TensorFlow
+    aliases: ["TensorFlow", "tensorflow", "TF"]
+    direction: [llm_train, cv_mm]
+    category: framework
+
+  - canonical: HuggingFace Transformers
+    aliases: ["Transformers", "HuggingFace", "Hugging Face", "huggingface"]
+    direction: [llm_app, llm_train]
+    category: framework
+
+  - canonical: FastAPI
+    aliases: ["FastAPI", "fastapi"]
+    direction: [llm_app, ai_infra]
+    category: framework
+
+  - canonical: Docker
+    aliases: ["Docker", "docker", "容器化"]
+    direction: [llm_app, ai_infra]
+    category: engineering
+
+  - canonical: Kubernetes
+    aliases: ["Kubernetes", "k8s", "K8S"]
+    direction: [ai_infra]
+    category: engineering
+
+  # ---------- 大模型应用 ----------
+  - canonical: RAG
+    aliases: ["RAG", "检索增强生成", "Retrieval-Augmented Generation", "检索增强", "知识库检索增强"]
+    direction: [llm_app]
+    category: technique
+    risk: ["RAGFlow", "RAGAS"]
+
+  - canonical: Agent
+    aliases: ["Agent", "智能体", "AI Agent", "Multi-Agent", "多智能体"]
+    direction: [llm_app]
+    category: technique
+
+  - canonical: 提示词工程
+    aliases: ["提示词工程", "Prompt Engineering", "Prompt 设计", "提示词设计", "Prompt优化", "提示词优化"]
+    direction: [llm_app]
+    category: technique
+
+  - canonical: 工具调用
+    aliases: ["工具调用", "Function Calling", "Tool Use", "function call", "工具集成"]
+    direction: [llm_app]
+    category: technique
+
+  - canonical: LangChain
+    aliases: ["LangChain", "langchain", "LangGraph"]
+    direction: [llm_app]
+    category: framework
+    risk: ["LangSmith"]
+
+  - canonical: LlamaIndex
+    aliases: ["LlamaIndex", "llama_index", "Llama Index"]
+    direction: [llm_app]
+    category: framework
+
+  - canonical: 向量数据库
+    aliases: ["向量数据库", "向量库", "Milvus", "FAISS", "Chroma", "Qdrant", "pgvector", "Pinecone"]
+    direction: [llm_app, nlp_rec]
+    category: tool
+
+  - canonical: Embedding
+    aliases: ["Embedding", "embedding", "向量化", "文本向量"]
+    direction: [llm_app, nlp_rec]
+    category: technique
+
+  # ---------- 大模型训练 ----------
+  - canonical: SFT
+    aliases: ["SFT", "监督微调", "Supervised Fine-Tuning", "指令微调", "Instruction Tuning"]
+    direction: [llm_train]
+    category: technique
+
+  - canonical: LoRA
+    aliases: ["LoRA", "QLoRA", "低秩适配", "PEFT"]
+    direction: [llm_train]
+    category: technique
+
+  - canonical: RLHF
+    aliases: ["RLHF", "人类反馈强化学习", "人类反馈的强化学习"]
+    direction: [llm_train]
+    category: technique
+
+  - canonical: 强化学习
+    aliases: ["强化学习", "Reinforcement Learning", "RL", "RLAIF"]
+    direction: [llm_train]
+    category: technique
+    risk: ["RLHF"]        # 与 RLHF 单独成条，避免重复计数
+
+  - canonical: DPO
+    aliases: ["DPO", "直接偏好优化", "Direct Preference Optimization"]
+    direction: [llm_train]
+    category: technique
+
+  - canonical: PPO
+    aliases: ["PPO", "近端策略优化", "Proximal Policy Optimization"]
+    direction: [llm_train]
+    category: technique
+
+  - canonical: 预训练
+    aliases: ["预训练", "Pre-training", "Pretraining", "从头训练"]
+    direction: [llm_train]
+    category: technique
+
+  - canonical: 分布式训练
+    aliases: ["分布式训练", "Distributed Training", "多机多卡", "数据并行", "模型并行", "张量并行"]
+    direction: [llm_train, ai_infra]
+    category: technique
+
+  - canonical: DeepSpeed
+    aliases: ["DeepSpeed", "deepspeed", "ZeRO"]
+    direction: [llm_train, ai_infra]
+    category: tool
+
+  - canonical: Megatron
+    aliases: ["Megatron", "Megatron-LM"]
+    direction: [llm_train, ai_infra]
+    category: tool
+
+  - canonical: 评测
+    aliases: ["模型评测", "评估体系", "Benchmark", "benchmark", "评测集", "Eval", "效果评估"]
+    direction: [llm_train, llm_app]
+    category: technique
+
+  # ---------- 推理与基础设施 ----------
+  - canonical: vLLM
+    aliases: ["vLLM", "vllm"]
+    direction: [ai_infra, llm_app]
+    category: tool
+
+  - canonical: CUDA
+    aliases: ["CUDA", "cuda", "cuDNN", "GPU 编程"]
+    direction: [ai_infra, llm_train]
+    category: technique
+
+  - canonical: TensorRT
+    aliases: ["TensorRT", "tensorrt", "TRT"]
+    direction: [ai_infra]
+    category: tool
+
+  - canonical: 模型量化
+    aliases: ["模型量化", "量化", "INT8", "int8", "INT4", "AWQ", "GPTQ"]
+    direction: [ai_infra, llm_train]
+    category: technique
+
+  - canonical: 模型部署
+    aliases: ["模型部署", "服务化", "模型服务", "推理服务", "上线部署"]
+    direction: [llm_app, ai_infra]
+    category: technique
+
+  - canonical: 推理优化
+    aliases: ["推理优化", "推理加速", "Inference Optimization", "延迟优化", "吞吐优化"]
+    direction: [ai_infra]
+    category: technique
+
+  # ---------- 视觉与多模态 ----------
+  - canonical: 多模态
+    aliases: ["多模态", "Multimodal", "VLM", "图文理解", "视觉语言模型"]
+    direction: [cv_mm, llm_train]
+    category: technique
+
+  - canonical: 计算机视觉
+    aliases: ["计算机视觉", "Computer Vision", "CV", "图像识别"]
+    direction: [cv_mm]
+    category: technique
+
+  - canonical: 目标检测
+    aliases: ["目标检测", "Object Detection", "YOLO", "检测算法"]
+    direction: [cv_mm]
+    category: technique
+
+  - canonical: 图像分割
+    aliases: ["图像分割", "语义分割", "实例分割", "Segmentation", "SAM"]
+    direction: [cv_mm]
+    category: technique
+
+  # ---------- NLP、搜索与推荐 ----------
+  - canonical: NLP
+    aliases: ["NLP", "自然语言处理", "Natural Language Processing"]
+    direction: [nlp_rec, llm_train]
+    category: technique
+
+  - canonical: 推荐算法
+    aliases: ["推荐算法", "推荐系统", "Recommender", "推荐模型"]
+    direction: [nlp_rec]
+    category: technique
+
+  - canonical: 召回
+    aliases: ["召回", "召回策略", "召回模型", "双塔"]
+    direction: [nlp_rec]
+    category: technique
+
+  - canonical: 排序
+    aliases: ["排序", "排序模型", "粗排", "精排", "Learning to Rank", "LTR"]
+    direction: [nlp_rec]
+    category: technique
+
+  - canonical: Elasticsearch
+    aliases: ["Elasticsearch", "elasticsearch", "ES 搜索", "OpenSearch"]
+    direction: [nlp_rec, llm_app]
+    category: tool
+
+  # ---------- 产品 ----------
+  - canonical: 需求分析
+    aliases: ["需求分析", "需求梳理", "产品设计"]
+    direction: [ai_product]
+    category: product
+
+  - canonical: 场景落地
+    aliases: ["场景落地", "落地经验", "业务落地", "方案设计"]
+    direction: [ai_product]
+    category: product
+
+  # ---------- 通用工程（2026-11-11 首次真实采样后补充） ----------
+  # 说明：首版 15 条重庆样本里，岗位标签高频出现 MySQL / Java / Golang / Redis / Django，
+  # 原词典未收录，导致技能覆盖率过低。补这一组用于看"需求构成"，不等于 AI 方向结论。
+  - canonical: MySQL
+    aliases: ["MySQL", "mysql"]
+    direction: [llm_app, ai_infra, nlp_rec]
+    category: database
+
+  - canonical: Redis
+    aliases: ["Redis", "redis"]
+    direction: [llm_app, ai_infra]
+    category: database
+
+  - canonical: Linux
+    aliases: ["Linux", "linux", "Linux系统", "Linux开发", "Linux部署"]
+    direction: [ai_infra, llm_app]
+    category: engineering
+
+  - canonical: Golang
+    aliases: ["Golang", "golang", "Go语言"]
+    direction: [llm_app, ai_infra]
+    category: language
+
+  - canonical: Java
+    aliases: ["Java", "java"]
+    direction: [llm_app, ai_infra]
+    category: language
+
+  - canonical: C++
+    aliases: ["C++", "cpp", "C＋＋"]
+    direction: [ai_infra, llm_train]
+    category: language
+
+  - canonical: Django
+    aliases: ["Django", "django"]
+    direction: [llm_app]
+    category: framework
+
+  - canonical: Flask
+    aliases: ["Flask", "flask"]
+    direction: [llm_app]
+    category: framework
+
+  - canonical: Kafka
+    aliases: ["Kafka", "kafka", "消息队列"]
+    direction: [ai_infra]
+    category: tool
+
+  - canonical: dify
+    aliases: ["dify", "Dify"]
+    direction: [llm_app]
+    category: tool
+
+  - canonical: 大模型开发
+    aliases: ["大模型开发", "大模型应用", "大模型应用开发", "LLM 开发", "LLM应用"]
+    direction: [llm_app]
+    category: technique
+
+  - canonical: 爬虫
+    aliases: ["爬虫", "爬虫经验", "数据采集"]
+    direction: []
+    category: technique

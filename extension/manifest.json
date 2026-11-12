@@ -1,0 +1,22 @@
+{
+  "manifest_version": 3,
+  "name": "岗位情报采集（本地）",
+  "version": "1.2.0",
+  "description": "把你当前浏览页面中已经显示的岗位内容，发送到本机运行的岗位分析系统。不接管浏览器，不修改页面。",
+  "content_scripts": [
+    {
+      "matches": [
+        "https://www.zhipin.com/*"
+      ],
+      "js": [
+        "extractor.js",
+        "content.js"
+      ],
+      "run_at": "document_idle"
+    }
+  ],
+  "permissions": [],
+  "host_permissions": [
+    "http://127.0.0.1:8000/*"
+  ]
+}

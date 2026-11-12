@@ -1,0 +1,36 @@
+# 环境与依赖
+backend/.venv/
+**/__pycache__/
+*.py[cod]
+*.egg-info/
+
+# 数据（含原始抓取与个人登录 profile，不入库）
+data/*.db
+data/*.db-wal
+data/*.db-shm
+data/raw/
+data/exports/
+data/logs/
+data/browser_profile/
+
+# 配置与密钥
+.env
+
+# 前端
+frontend/node_modules/
+frontend/dist/
+
+# 系统
+Thumbs.db
+.DS_Store
+
+data/test-runs/
+output/playwright/
+.pytest_cache/
+
+# 本机数据和输出不发布
+/data/
+/output/
+.env.*
+!.env.example
+*.log

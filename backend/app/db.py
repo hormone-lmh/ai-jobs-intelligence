@@ -1,4 +1,4 @@
-"""数据模型与会话（SQLite + SQLAlchemy 2.0）。
+"""数据模型与会话（SQLite / MySQL + SQLAlchemy 2.0）。
 
 设计遵循 docs/00-技术方案.md §3：
   - job_posting   一个岗位一行，按平台职位 ID 去重
@@ -26,6 +26,8 @@ from sqlalchemy import (
     func,
 )
 from sqlalchemy.orm import declarative_base, relationship, sessionmaker
+from sqlalchemy.engine import make_url
+from sqlalchemy.dialects.mysql import DATETIME, LONGTEXT
 
 ROOT = Path(__file__).resolve().parents[2]
 load_dotenv(ROOT / ".env")
@@ -33,9 +35,21 @@ load_dotenv(ROOT / ".env")
 _default_db = str(ROOT / "data" / "jobs.db").replace("\\", "/")
 DB_URL = os.getenv("DATABASE_URL") or f"sqlite:///{_default_db}"
 
-engine = create_engine(DB_URL, connect_args={"check_same_thread": False}, future=True)
+def build_engine(url):
+    options = {"pool_pre_ping": True}
+    if make_url(url).get_backend_name() == "sqlite":
+        options["connect_args"] = {"check_same_thread": False}
+    else:
+        options["pool_recycle"] = 1800
+    return create_engine(url, **options)
+
+
+engine = build_engine(DB_URL)
 SessionLocal = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False, future=True)
 Base = declarative_base()
+# MySQL 默认 DATETIME 丢失微秒，TEXT 也容纳不下允许提交的长篇中文 JD。
+DateTime = DateTime().with_variant(DATETIME(fsp=6), "mysql")
+Text = Text().with_variant(LONGTEXT(), "mysql")
 
 
 class Job(Base):
@@ -102,6 +116,14 @@ class JobDetail(Base):
     sections_json = Column(Text) # 分段 JSON
     char_len = Column(Integer, default=0)
     captured_at = Column(DateTime, default=datetime.now)
+
+
+class DeletedJob(Base):
+    """仅保存删除标记，防止插件或原始记录回放重新导入岗位。"""
+    __tablename__ = "deleted_job"
+    id = Column(Integer, primary_key=True)
+    job_key = Column(String(64), unique=True, index=True, nullable=False)
+    deleted_at = Column(DateTime, default=datetime.now, nullable=False)
 
 
 def init_db() -> None:

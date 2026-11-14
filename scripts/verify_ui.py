@@ -70,6 +70,11 @@ try:
         page.get_by_role('button',name='保存并重新分析').click()
         page.get_by_text('已保存，正文技能已重新分析。',exact=True).wait_for()
         page.locator('#source').select_option('jd')
+        page.locator('#heatGrid button').filter(has_text='PyTorch').wait_for()
+        assert page.locator('#heatGrid button').filter(has_text='PyTorch').get_attribute('aria-label').startswith('PyTorch：1 个岗位')
+        page.locator('#heatGrid button').filter(has_text='PyTorch').click()
+        page.get_by_text('共 1 条 · 本页 1 条',exact=True).wait_for()
+        page.locator('#heatGrid button').filter(has_text='PyTorch').click()
         page.locator('#skills button').filter(has_text='PyTorch').click()
         page.get_by_text('共 1 条 · 本页 1 条',exact=True).wait_for()
         page.get_by_role('button',name='查看正文与技能依据').click()
@@ -85,6 +90,20 @@ try:
         assert 'PyTorch' not in [r['skill'] for r in result['items']]
         page.get_by_role('button',name='清除技能筛选').click()
         page.get_by_text('共 23 条 · 本页 20 条',exact=True).wait_for()
+        # New ingestion must update counts via the timer without a manual refresh.
+        api('/api/import/jd',{'url':'https://www.zhipin.com/job_detail/qa1.html','jd_text':'岗位要求：熟练使用 Java 和 Docker 完成开发、部署及线上系统维护。'})
+        page.wait_for_function("document.querySelector('[data-heat-skill=Java] strong')?.textContent==='2'",timeout=40000)
+        page.locator('#heatAuto').uncheck()
+        page.get_by_text('自动更新已暂停',exact=False).wait_for()
+        page.route('**/api/stats/skills?*',lambda route:route.abort())
+        page.locator('#heatAuto').check()
+        page.locator('#heatStatus').filter(has_text='同步失败').wait_for()
+        assert page.locator('[data-heat-skill=Java] strong').inner_text()=='2'
+        page.unroute('**/api/stats/skills?*')
+        page.locator('#heatAuto').uncheck()
+        page.locator('#heatAuto').check()
+        page.locator('#heatStatus').filter(has_text='最近同步').wait_for()
+        page.locator('#heatGrid').screenshot(path=str(OUT/'heatmap.png'))
         page.evaluate('window.scrollTo(0,0)')
         page.screenshot(path=str(OUT/'dashboard-preview.png'))
         page.screenshot(path=str(OUT/'dashboard-desktop.png'),full_page=True)
@@ -113,6 +132,35 @@ try:
         page.set_viewport_size({'width':390,'height':844})
         assert page.evaluate('document.documentElement.scrollWidth <= innerWidth')
         page.screenshot(path=str(OUT/'comparison-mobile.png'),full_page=True)
+        page.get_by_role('button',name='岗位与技能',exact=True).click()
+        page.locator('#resetFilters').click()
+        page.get_by_text('共 23 条 · 本页 20 条',exact=True).wait_for()
+        page.once('dialog',lambda dialog:dialog.dismiss())
+        page.locator('#jobs .deleteJob').first.click()
+        assert api('/api/stats/overview')['jobs']==23
+        # Failure leaves records and controls intact.
+        page.route('**/api/jobs/qa*',lambda route:route.abort() if route.request.method=='DELETE' else route.continue_())
+        page.once('dialog',lambda dialog:dialog.accept())
+        page.locator('#jobs .deleteJob').first.click()
+        page.locator('#deleteStatus').filter(has_text='删除未确认成功').wait_for()
+        assert api('/api/stats/overview')['jobs']==23
+        page.unroute('**/api/jobs/qa*')
+        page.locator('#query').fill('Python 工程师 0')
+        page.locator('#search').click()
+        page.get_by_text('共 1 条 · 本页 1 条',exact=True).wait_for()
+        page.get_by_role('button',name='查看正文与技能依据').click()
+        page.locator('#detailMeta .deleteJob').wait_for()
+        page.once('dialog',lambda dialog:dialog.accept())
+        page.locator('#detailMeta .deleteJob').click()
+        page.get_by_text('共 0 条 · 本页 0 条',exact=True).wait_for()
+        assert not page.locator('#detailDialog').is_visible()
+        assert api('/api/stats/overview')['jobs']==22
+        result=api('/api/ingest/page',{'url':'https://www.zhipin.com/web/geek/jobs','page_type':'list','cards':[cards[0]]})
+        assert result['skipped']==1 and api('/api/stats/overview')['jobs']==22
+        page.locator('#resetFilters').click()
+        page.get_by_text('共 22 条 · 本页 20 条',exact=True).wait_for()
+        assert page.locator('[data-heat-skill=Java] strong').inner_text()=='1'
+        page.screenshot(path=str(OUT/'delete-result-mobile.png'),full_page=True)
         assert not errors,errors
         browser.close()
     assert before == (hashlib.sha256(original.read_bytes()).hexdigest() if original.exists() else None)

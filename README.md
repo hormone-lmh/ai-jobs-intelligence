@@ -1,6 +1,6 @@
 # AI 岗位情报分析系统
 
-本机运行的岗位采集与分析原型。当前使用 **FastAPI + SQLite + 原生 HTML/CSS/JavaScript**，不需要 Node 构建前端。数据由浏览器扩展跟随本人浏览上报，或手动粘贴岗位正文。
+本机运行的岗位采集与分析原型。当前使用 **FastAPI + SQLite / MySQL + 原生 HTML/CSS/JavaScript**，不需要 Node 构建前端。数据由浏览器扩展跟随本人浏览上报，或手动粘贴岗位正文。
 
 ## 启动
 
@@ -11,11 +11,15 @@ pwsh -ExecutionPolicy Bypass -File scripts\start.ps1
 
 已有 `backend/.venv` 时可直接运行第二条。`start.ps1` 在后台运行服务并检查首页，重复执行不会重复启动；开发时可用 `dev.ps1` 在终端开启自动重载。打开 http://127.0.0.1:8000/ 。更新代码后重启服务；更新扩展后在 `chrome://extensions/` 重新加载扩展，再刷新招聘页面。
 
+使用 Windows 自带的 PowerShell 5.1 时，可运行 `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\start.ps1`。项目的 `.ps1` 文件使用 UTF-8 BOM 保存，以兼容中文内容；编辑时请保持此编码（`.editorconfig` 已配置）。
+
 ## 已实现
 
 - 按职位 ID 去重，保存列表信息、原始上报及当前岗位正文。
 - 正文 / 标题与标签两种独立技能统计；显示分母、样本量与 JD 覆盖率。
 - 岗位或公司搜索、城市筛选、技能筛选、分页。
+- 手动删除岗位：卡片或详情中确认删除，清理正文及技能，并阻止插件和历史回放重新导入。
+- 技能需求热力图：热门 20/50 项、去重岗位数、筛选联动与点击下钻；可每 30 秒同步本地最新技能统计。
 - 本地查看岗位正文、各技能对应原文片段与来源。
 - 粘贴 BOSS 职位链接与正文，保存后重新分析。
 - 新正文替换旧正文技能；旧记录回放不覆盖新内容。
@@ -42,7 +46,8 @@ pwsh -ExecutionPolicy Bypass -File scripts\start.ps1
 - `backend/app/`：后端、解析、技能提取；`static/` 为实际前端。
 - `extension/`：Chrome / Edge 扩展。
 - `config/taxonomy.yaml`：技能词典；修改后需重启并回放原始数据重新提取。
-- `data/jobs.db`：真实数据库；`data/raw/extension/`：原始上报。
+- `data/jobs.db`：默认 SQLite 数据库；配置 MySQL 后不再写入此文件。`data/raw/extension/`：原始上报。
+- `docs/04-MySQL迁移.md`：MySQL 连接、迁移、校验与备份说明。
 - `tests/`：隔离数据库回归测试；不使用真实岗位数据。
 - `docs/02-使用说明.md`：安装扩展、操作流程和故障处理。
 - `docs/03-指标口径.md`：统计定义与已知限制。

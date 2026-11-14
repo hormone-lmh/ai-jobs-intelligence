@@ -107,3 +107,17 @@ def test_detail_before_list_and_foreign_skill_ignored():
     main._ingest_cards([card()],NOW)
     assert main.job_detail('test1')['job']['title']=='Python engineer'
     assert 'Kubernetes' not in mentions('jd')
+
+
+def test_saved_character_count_matches_normalized_body_and_old_snapshot_receipt():
+    first = '岗位职责：负责 Python 模型训练与部署。🚀'
+    second = '任职要求：具备实际项目经验，熟悉软件开发。'
+    result = main._ingest_detail(URL, {'sections':['  '+first+'\r\n', '', first, '\t'+second+'  ']}, NOW)
+    expected = first + '\n\n' + second
+    detail = main.job_detail('test1')
+    assert detail['jd_text'] == expected
+    assert result['jd_chars'] == detail['char_len'] == len(expected)
+    older = main._ingest_detail(URL, {'sections':['这段过时岗位正文不应覆盖较新的内容。'*3]}, NOW-timedelta(days=1))
+    assert older['ignored'] == 'older_snapshot'
+    assert older['jd_chars'] == len(expected)
+    assert main.job_detail('test1')['jd_text'] == expected

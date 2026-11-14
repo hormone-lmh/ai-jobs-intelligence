@@ -21,7 +21,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import func
 
-from .db import IngestBatch, Job, JobDetail, SkillMention, get_session, init_db
+from .db import IngestBatch, Job, JobDetail, SkillMention, DeletedJob, get_session, init_db
 from .parsing import JOB_KEY_RE, parse_card
 from .skills import get_matcher
 from .intelligence import router as intelligence_router
@@ -82,9 +82,11 @@ def _parse_time(s: str | None) -> datetime:
         return datetime.now()
 
 
-def _upsert_job(session, parsed: dict[str, Any], captured_at: datetime) -> bool:
-    """返回 True 表示新增，False 表示更新已有记录。"""
-    job = session.query(Job).filter(Job.job_key == parsed["job_key"]).one_or_none()
+def _upsert_job(session, parsed: dict[str, Any], captured_at: datetime) -> bool | None:
+    """True 为新增，False 为更新，None 为用户已删除。"""
+    job = session.query(Job).filter(Job.job_key == parsed["job_key"]).with_for_update().one_or_none()
+    if session.query(DeletedJob.id).filter_by(job_key=parsed["job_key"]).first():
+        return None
     created = job is None
     if created:
         job = Job(job_key=parsed["job_key"], first_seen=captured_at)
@@ -162,7 +164,10 @@ def _ingest_cards(cards: list[dict[str, Any]], captured_at: datetime) -> dict[st
             if not parsed:
                 skipped += 1
                 continue
-            if _upsert_job(session, parsed, captured_at):
+            result = _upsert_job(session, parsed, captured_at)
+            if result is None:
+                skipped += 1
+            elif result:
                 accepted += 1
             else:
                 updated += 1
@@ -194,7 +199,9 @@ def _ingest_detail(url: str, detail: dict[str, Any] | None, captured_at: datetim
 
     session = get_session()
     try:
-        job = session.query(Job).filter(Job.job_key == job_key).one_or_none()
+        job = session.query(Job).filter(Job.job_key == job_key).with_for_update().one_or_none()
+        if session.query(DeletedJob.id).filter_by(job_key=job_key).first():
+            return {"ok": True, "job_key": job_key, "ignored": "deleted_job", "jd_chars": 0}
         if job is None:
             # 详情页先于列表页到达：先占位，后续列表上报会补齐字段
             job = Job(job_key=job_key, title="(待列表页补齐)", first_seen=captured_at, last_seen=captured_at, url=url)
@@ -203,7 +210,8 @@ def _ingest_detail(url: str, detail: dict[str, Any] | None, captured_at: datetim
 
         snap = session.query(JobDetail).filter(JobDetail.job_id == job.id).one_or_none()
         if snap is not None and snap.captured_at and captured_at < snap.captured_at:
-            return {"ok": True, "job_key": job_key, "ignored": "older_snapshot"}
+            return {"ok": True, "job_key": job_key, "ignored": "older_snapshot",
+                    "jd_chars": len(snap.jd_text or "")}
         if snap is None:
             snap = JobDetail(job_id=job.id, job_key=job_key)
             session.add(snap)
@@ -248,6 +256,22 @@ def _ingest_detail(url: str, detail: dict[str, Any] | None, captured_at: datetim
 @app.get("/api/health")
 def health() -> dict[str, Any]:
     return {"ok": True, "service": "jobs-intel", "root": str(ROOT)}
+
+
+@app.delete("/api/jobs/{job_key}")
+def delete_job(job_key: str):
+    with get_session() as session:
+        job = session.query(Job).filter_by(job_key=job_key).with_for_update().one_or_none()
+        if job is None:
+            if session.query(DeletedJob.id).filter_by(job_key=job_key).first():
+                return {"ok": True, "job_key": job_key, "already_deleted": True}
+            raise HTTPException(status_code=404, detail={"reason": "岗位不存在"})
+        session.add(DeletedJob(job_key=job_key))
+        session.query(JobDetail).filter_by(job_id=job.id).delete(synchronize_session=False)
+        session.query(SkillMention).filter_by(job_id=job.id).delete(synchronize_session=False)
+        session.query(Job).filter_by(id=job.id).delete(synchronize_session=False)
+        session.commit()
+        return {"ok": True, "job_key": job_key}
 
 
 @app.post("/api/ingest/page")
@@ -300,10 +324,13 @@ def ingest_page(p: PagePayload) -> dict[str, Any]:
 @app.post("/api/import/jd")
 def import_jd(p: ManualDetail) -> dict[str, Any]:
     """用户粘贴目标岗位的职责/要求；采用与扩展一致的正文处理流程。"""
-    return ingest_page(PagePayload(
+    result = ingest_page(PagePayload(
         url=p.url, page_type="detail", captured_at=datetime.now().astimezone().isoformat(),
         detail={"sections": [p.jd_text], "headings": ["手动录入岗位正文"]},
     ))
+    if result.get("detail", {}).get("ignored") == "deleted_job":
+        raise HTTPException(status_code=409, detail={"reason": "该岗位已被手动删除，不能重新导入"})
+    return result
 
 
 @app.post("/api/import/raw")

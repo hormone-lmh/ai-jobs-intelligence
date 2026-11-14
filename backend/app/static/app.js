@@ -26,6 +26,7 @@ async function api(url, options) {
 function params(extra = {}) { return new URLSearchParams({q: state.q, city: state.city, company: state.company, source: state.source, ...extra}); }
 function fail(error) { $('status').textContent = '加载失败：' + error.message + '。请检查本地服务后重试。'; $('status').classList.add('error'); }
 function renderSkills() {
+  if (typeof renderHeatmap === 'function') renderHeatmap();
   $('skills').replaceChildren();
   $('clearSkill').hidden = !state.skill;
   if (!state.skills.length) $('skills').append(node('p', state.source === 'jd' ? '当前范围暂无正文技能数据。请浏览详情页，或在下方粘贴岗位正文。' : '当前范围暂无匹配到的技能。', 'empty'));
@@ -63,6 +64,9 @@ function renderJobs(data) {
     const add = node('button', job.has_jd ? '更新正文' : '补充正文');
     add.onclick = () => {$('jdUrl').value = safeUrl(job.url) || ''; $('jdText').value = ''; $('jdText').focus(); $('jdForm').scrollIntoView({behavior:'smooth',block:'center'});};
     actions.append(detail, add);
+    const remove = node('button', '删除岗位', 'deleteJob');
+    remove.onclick = () => removeJob(job, remove);
+    actions.append(remove);
     const href = safeUrl(job.url);
     if (href) { const link = node('a', '打开 BOSS 原页面 ↗'); link.href = href; link.target = '_blank'; link.rel = 'noopener noreferrer'; actions.append(link); }
     card.append(actions); $('jobs').append(card);
@@ -79,6 +83,7 @@ async function loadJobs() {
 }
 async function refresh() {
   const ticket = ++state.request;
+  if (typeof clearHeatmap === 'function') clearHeatmap();
   $('status').classList.remove('error'); $('status').textContent = '正在更新数据…';
   $('refresh').disabled = true;
   try {
@@ -97,11 +102,12 @@ async function refresh() {
     $('coverageFill').style.width = `${overview.jobs ? Math.min(100,overview.jd_jobs/overview.jobs*100) : 0}%`;
     $('lastSeen').textContent = time(overview.last_seen);
     state.skills = skills.items;
+    if (typeof acceptHeatmap === 'function') acceptHeatmap(skills);
     $('skillsTitle').textContent = state.source === 'jd' ? '岗位正文技能提及' : '标题与标签技能分布';
     $('denominator').textContent = state.source === 'jd' ? `分母：当前范围有正文的 ${skills.total_jobs} 条岗位；共搜集 ${skills.sampled_jobs} 条。` : `分母：当前范围全部 ${skills.total_jobs} 条岗位；仅使用标题与标签，不能替代任职要求分析。`;
     renderFilterChips(); renderSkills(); await loadJobs();
     if (ticket === state.request) $('status').textContent = '已同步本地数据 · 总览为全部样本，列表与分析按条件筛选';
-  } catch (error) {if(ticket === state.request) fail(error);}
+  } catch (error) {if(ticket === state.request) {fail(error); if(typeof heatmapFailure === 'function') heatmapFailure();}}
   finally {if(ticket === state.request) $('refresh').disabled = false;}
 }
 
@@ -116,6 +122,26 @@ function renderFilterChips() {
   }
 }
 let detailRequest = 0;
+async function removeJob(job, button) {
+  if(!confirm(`确定删除「${job.title}」${job.company?'（'+job.company+'）':''}？\n\n将删除岗位、正文和技能记录，并阻止再次采集。此操作不能在页面中撤销。原始采集文件和历史备份仍保留。`))return;
+  button.disabled=true;
+  $('deleteStatus').classList.remove('error');
+  $('deleteStatus').textContent='正在删除岗位…';
+  try {
+    await api('/api/jobs/'+encodeURIComponent(job.job_key),{method:'DELETE'});
+  } catch(error) {
+    $('deleteStatus').classList.add('error');
+    $('deleteStatus').textContent='删除未确认成功：'+error.message+'。请刷新核对后重试。';
+    button.disabled=false;return;
+  }
+  detailRequest++;jobsRequest++;state.request++;
+  if(typeof compareTicket!=='undefined')compareTicket++;
+  $('detailDialog').close();state.offset=0;
+  for(const id of ['compareResults','compareSummary','compareWarnings'])$(id).replaceChildren();
+  $('compareStatus').textContent='岗位数据已变更，请重新分析两组需求。';
+  $('deleteStatus').textContent=`已删除「${job.title}」，后续采集将跳过此岗位。`;
+  await refresh();
+}
 async function showDetail(key) {
   const ticket = ++detailRequest;
   $('detailTitle').textContent = '正在加载…'; $('detailBody').textContent = ''; $('detailMeta').textContent = ''; $('evidence').replaceChildren();
@@ -124,7 +150,10 @@ async function showDetail(key) {
     const detail = await api('/api/jobs/' + encodeURIComponent(key) + '/detail');
     if (ticket !== detailRequest) return;
     $('detailTitle').textContent = detail.job.title;
-    $('detailMeta').textContent = `${detail.job.company || '公司待补齐'} · 正文采集时间：${time(detail.captured_at)}`;
+    $('detailMeta').textContent = `${detail.job.company || '公司待补齐'} · 已保存 ${detail.char_len} 字符（含空白） · 正文采集时间：${time(detail.captured_at)}`;
+    const remove = node('button','删除岗位','deleteJob');
+    remove.onclick=()=>removeJob({...detail.job,job_key:key},remove);
+    $('detailMeta').append(' ',remove);
     $('detailBody').textContent = detail.jd_text || '尚未采集岗位正文。请浏览该岗位详情页或使用下方的正文录入入口。';
     const names = {jd:'正文',tag:'列表标签',title:'岗位标题'};
     for (const hit of detail.skills) {

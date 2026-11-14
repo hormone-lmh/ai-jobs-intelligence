@@ -1,4 +1,4 @@
-$ErrorActionPreference = 'Stop'
+﻿$ErrorActionPreference = 'Stop'
 $ProjectRoot = Split-Path -Parent $PSScriptRoot
 $Python = Join-Path $ProjectRoot 'backend\.venv\Scripts\python.exe'
 $ServiceUrl = 'http://127.0.0.1:8000'
@@ -7,7 +7,9 @@ if (-not (Test-Path -LiteralPath $Python)) {
 }
 function Test-JobService {
     try {
-        $Health = Invoke-RestMethod "$ServiceUrl/api/health" -TimeoutSec 2
+        # Windows PowerShell 5.1 may decode JSON without a charset as ANSI.
+        $Response = Invoke-WebRequest "$ServiceUrl/api/health" -UseBasicParsing -TimeoutSec 2
+        $Health = [System.Text.Encoding]::UTF8.GetString($Response.RawContentStream.ToArray()) | ConvertFrom-Json
         return ($Health.ok -and $Health.service -eq 'jobs-intel' -and $Health.root -eq $ProjectRoot)
     } catch { return $false }
 }
@@ -26,7 +28,7 @@ $ServiceProcess = Start-Process -FilePath $Python -ArgumentList '-B','-m','uvico
 for ($Attempt = 0; $Attempt -lt 30; $Attempt++) {
     Start-Sleep -Milliseconds 500
     if (Test-JobService) {
-        $Page = Invoke-WebRequest "$ServiceUrl/" -TimeoutSec 5
+        $Page = Invoke-WebRequest "$ServiceUrl/" -UseBasicParsing -TimeoutSec 5
         if ($Page.StatusCode -eq 200) {
             Write-Host "已启动：$ServiceUrl（进程 $($ServiceProcess.Id)）"
             Write-Host "日志：$ErrorLog"

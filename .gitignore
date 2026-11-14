@@ -34,3 +34,4 @@ output/playwright/
 .env.*
 !.env.example
 *.log
+.idea/

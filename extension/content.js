@@ -7,7 +7,7 @@
   badge.id='jobs-intel-status';badge.setAttribute('role','status');
   badge.style.cssText='position:fixed;right:18px;bottom:18px;z-index:2147483647;padding:10px 14px;max-width:350px;background:#123c36;color:white;font:13px/1.5 sans-serif;border-radius:8px;box-shadow:0 2px 12px #0003;pointer-events:none';
   document.documentElement.append(badge);
-  const status=message=>{badge.textContent='岗位采集 v1.2 · '+message;};
+  const status=message=>{badge.textContent='岗位采集 v1.3 · '+message;};
   async function send(payload) {
     const response=await fetch('http://127.0.0.1:8000/api/ingest/page',{
       method:'POST',headers:{'Content-Type':'application/json'},signal:AbortSignal.timeout(10000),
@@ -15,6 +15,8 @@
     if(!response.ok)throw Error('本地服务返回 HTTP '+response.status);
     const result=await response.json();
     if(result.ok!==true || result.detail?.ok===false)throw Error('本地服务未接受正文');
+    if(payload.page_type==='detail' && (result.detail?.ok!==true || !Number.isInteger(result.detail.jd_chars) || result.detail.jd_chars<0))
+      throw Error('服务未返回已保存字数，请更新并重启本地服务');
     return result;
   }
   async function tick(){
@@ -31,15 +33,24 @@
       if(detail.payload)payloads.push(detail.payload);
       for(const payload of payloads){
         const key=payload.page_type+'|'+payload.url, fingerprint=JSON.stringify(payload);
-        if(sent.get(key)===fingerprint)continue;
+        if(sent.get(key)?.fingerprint===fingerprint)continue;
         status(payload.page_type==='detail'?'正在保存正文…':'正在保存列表…');
         const result=await send(payload);
-        sent.set(key,fingerprint);
+        sent.set(key,{fingerprint,detail:result.detail});
         if(sent.size>100)sent.delete(sent.keys().next().value);
         console.info('[jobs-intel] 已保存',payload.page_type,result);
       }
       failures=0;retryAt=0;
-      status(detail.payload ? '正文已保存 · '+detail.payload.detail.sections.join('\n').length+' 字' : (cards.length?'列表已保存 · ':'')+detail.status);
+      if(detail.payload){
+        // 页面切换可能发生在请求期间，不能把上一岗位的回执显示在新岗位上。
+        if(JSON.stringify(JobsIntelExtractor.extract().payload)!==JSON.stringify(detail.payload)){
+          status('页面正文已变化，等待重新保存');return;
+        }
+        const saved=sent.get('detail|'+detail.payload.url)?.detail;
+        status(saved.ignored==='deleted_job' ? '此岗位已手动删除，已跳过采集' : (saved.ignored ? '本次正文未覆盖较新记录 · 库内 ' : '正文已保存 · ')+saved.jd_chars+' 字符（含空白）');
+      }else{
+        status((cards.length?'列表已保存 · ':'')+detail.status);
+      }
     }catch(error){
       failures++;retryAt=Date.now()+Math.min(60000,2500*2**Math.min(failures,5));
       status('未保存：'+error.message+'；将重试');console.warn('[jobs-intel]',error);
